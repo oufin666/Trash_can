@@ -1,0 +1,45 @@
+{
+  "configurations": [
+    {
+      "name": "windows-gcc-x64",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "${workspaceFolder}/Core/Inc",
+        "${workspaceFolder}/Core/Src",
+        "${workspaceFolder}/Drivers/BSP/Inc",
+        "${workspaceFolder}/Drivers/BSP/Src",
+        "${workspaceFolder}/Drivers/STM32F4xx_HAL_Driver/Inc",
+        "${workspaceFolder}/Drivers/CMSIS/Device/ST/STM32F4xx/Include",
+        "${workspaceFolder}/Drivers/CMSIS/Include",
+        "${workspaceFolder}/Middlewares/Third_Party/FreeRTOS/Source/include",
+        "${workspaceFolder}/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM4F",
+        "${workspaceFolder}/Middlewares/Third_Party/FreeRTOS/Source/portable/MemMang"
+      ],
+      "defines": [
+        "STM32F407xx",
+        "USE_HAL_DRIVER",
+        "ARM_MATH_CM4",
+        "USE_FULL_ASSERT"
+      ],
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "windows-gcc-x64",
+      "browse": {
+        "path": [
+          "${workspaceFolder}/Core/Inc",
+          "${workspaceFolder}/Core/Src",
+          "${workspaceFolder}/Drivers/BSP/Inc",
+          "${workspaceFolder}/Drivers/BSP/Src",
+          "${workspaceFolder}/Drivers/STM32F4xx_HAL_Driver/Inc",
+          "${workspaceFolder}/Drivers/CMSIS/Device/ST/STM32F4xx/Include",
+          "${workspaceFolder}/Drivers/CMSIS/Include",
+          "${workspaceFolder}/Middlewares/Third_Party/FreeRTOS/Source"
+        ],
+        "limitSymbolsToIncludedHeaders": true,
+        "databaseFilename": "${workspaceFolder}/.vscode/browse.vc.db"
+      },
+      "compilerPath": "gcc"
+    }
+  ],
+  "version": 4
+}
