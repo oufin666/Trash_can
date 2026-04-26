@@ -26,6 +26,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "motor.h"
+#include "pid.h"
 #include "stdio.h"
 #include "adc.h"
 #include "usart.h"
@@ -56,7 +57,11 @@ extern volatile uint8_t encoder4_flag;
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
+int16_t g_motor_speed[4] = {0, 0, 0, 0};  /* 四个电机独立目标速度（脉冲/秒）*/
 
+/* 串口指令缓冲区 */
+uint8_t uart_rx_buf[3] = {0};  /* 存储接收到的指令：[0]=包头, [1]=指令, [2]=包尾 */
+uint8_t uart_rx_index = 0;      /* 接收索引 */
 /* USER CODE END Variables */
 /* Definitions for VisionTask */
 osThreadId_t VisionTaskHandle;
@@ -213,11 +218,13 @@ void StartMotionTask(void *argument)
   /* 初始化电机 */
   Motor_Init();
   
-  /* 设置四个电机以50%占空比正转 */
-  Motor_SetSpeed(MOTOR_1, 500);  /* 500/1000 = 50%占空比 */
-  Motor_SetSpeed(MOTOR_2, 500);
-  Motor_SetSpeed(MOTOR_3, 500);
-  Motor_SetSpeed(MOTOR_4, 500);
+  /* 初始化PID控制器 */
+  PID_MotorInit();
+  
+  /* 实际速度（脉冲/秒）和PID输出 */
+  int16_t actual_speed1, actual_speed2, actual_speed3, actual_speed4;
+  int16_t pid_output1, pid_output2, pid_output3, pid_output4;
+  int16_t target_speed1, target_speed2, target_speed3, target_speed4;
   
   /* Infinite loop */
   for(;;)
@@ -240,13 +247,47 @@ void StartMotionTask(void *argument)
       encoder4_flag = 0;
     }
     
-    /* 每100ms计算一次编码器速度 */
-    Encoder_CalculateSpeed(1, 100);
-    Encoder_CalculateSpeed(2, 100);
-    Encoder_CalculateSpeed(3, 100);
-    Encoder_CalculateSpeed(4, 100);
+    /* 计算编码器速度（脉冲/秒）*/
+    Encoder_CalculateSpeed(1, PID_CONTROL_PERIOD);
+    Encoder_CalculateSpeed(2, PID_CONTROL_PERIOD);
+    Encoder_CalculateSpeed(3, PID_CONTROL_PERIOD);
+    Encoder_CalculateSpeed(4, PID_CONTROL_PERIOD);
     
-    osDelay(100);
+    /* 获取实际速度（脉冲/秒）*/
+    actual_speed1 = Encoder_GetSpeed(1);
+    actual_speed2 = Encoder_GetSpeed(2);
+    actual_speed3 = Encoder_GetSpeed(3);
+    actual_speed4 = Encoder_GetSpeed(4);
+    
+    /* 获取各电机目标速度并限幅 */
+    target_speed1 = g_motor_speed[0];
+    target_speed2 = g_motor_speed[1];
+    target_speed3 = g_motor_speed[2];
+    target_speed4 = g_motor_speed[3];
+    
+    /* 限幅保护 */
+    if (target_speed1 > MOTOR_MAX_SPEED_PPS) target_speed1 = MOTOR_MAX_SPEED_PPS;
+    if (target_speed1 < -MOTOR_MAX_SPEED_PPS) target_speed1 = -MOTOR_MAX_SPEED_PPS;
+    if (target_speed2 > MOTOR_MAX_SPEED_PPS) target_speed2 = MOTOR_MAX_SPEED_PPS;
+    if (target_speed2 < -MOTOR_MAX_SPEED_PPS) target_speed2 = -MOTOR_MAX_SPEED_PPS;
+    if (target_speed3 > MOTOR_MAX_SPEED_PPS) target_speed3 = MOTOR_MAX_SPEED_PPS;
+    if (target_speed3 < -MOTOR_MAX_SPEED_PPS) target_speed3 = -MOTOR_MAX_SPEED_PPS;
+    if (target_speed4 > MOTOR_MAX_SPEED_PPS) target_speed4 = MOTOR_MAX_SPEED_PPS;
+    if (target_speed4 < -MOTOR_MAX_SPEED_PPS) target_speed4 = -MOTOR_MAX_SPEED_PPS;
+    
+    /* 执行速度PID闭环控制 */
+    pid_output1 = PID_MotorSpeedControl(MOTOR_1, target_speed1, actual_speed1);
+    pid_output2 = PID_MotorSpeedControl(MOTOR_2, target_speed2, actual_speed2);
+    pid_output3 = PID_MotorSpeedControl(MOTOR_3, target_speed3, actual_speed3);
+    pid_output4 = PID_MotorSpeedControl(MOTOR_4, target_speed4, actual_speed4);
+    
+    /* 将PID输出应用到电机 */
+    Motor_SetSpeed(MOTOR_1, pid_output1);
+    Motor_SetSpeed(MOTOR_2, pid_output2);
+    Motor_SetSpeed(MOTOR_3, pid_output3);
+    Motor_SetSpeed(MOTOR_4, pid_output4);
+    
+    osDelay(PID_CONTROL_PERIOD);  /* PID控制周期 */
   }
   /* USER CODE END StartMotionTask */
 }
@@ -277,18 +318,116 @@ void StartStateTask(void *argument)
 * @retval None
 */
 /* USER CODE END Header_StartDebugTask */
+/* 串口指令解析函数 */
+void ParseUARTCommand(uint8_t cmd)
+{
+  int16_t speed = DEFAULT_SPEED;
+  
+  switch(cmd)
+  {
+    /* 运动控制指令 */
+    case CMD_MOVE_FORWARD:
+      /* 前进：电机1正转，电机2反转，电机3反转，电机4正转 */
+      g_motor_speed[0] = speed;   /* 电机1正转 */
+      g_motor_speed[1] = -speed;  /* 电机2反转 */
+      g_motor_speed[2] = -speed;  /* 电机3反转 */
+      g_motor_speed[3] = speed;   /* 电机4正转 */
+      break;
+      
+    case CMD_MOVE_BACKWARD:
+      /* 后退：电机1反转，电机2正转，电机3正转，电机4反转 */
+      g_motor_speed[0] = -speed;  /* 电机1反转 */
+      g_motor_speed[1] = speed;   /* 电机2正转 */
+      g_motor_speed[2] = speed;   /* 电机3正转 */
+      g_motor_speed[3] = -speed;  /* 电机4反转 */
+      break;
+      
+    case CMD_MOVE_LEFT:
+      /* 向左：电机1反转，电机2反转，电机3正转，电机4正转 */
+      g_motor_speed[0] = -speed;  /* 电机1反转 */
+      g_motor_speed[1] = -speed;  /* 电机2反转 */
+      g_motor_speed[2] = speed;   /* 电机3正转 */
+      g_motor_speed[3] = speed;   /* 电机4正转 */
+      break;
+      
+    case CMD_MOVE_RIGHT:
+      /* 向右：电机1正转，电机2正转，电机3反转，电机4反转 */
+      g_motor_speed[0] = speed;   /* 电机1正转 */
+      g_motor_speed[1] = speed;   /* 电机2正转 */
+      g_motor_speed[2] = -speed;  /* 电机3反转 */
+      g_motor_speed[3] = -speed;  /* 电机4反转 */
+      break;
+      
+    case CMD_MOVE_STOP:
+      /* 停止：所有电机速度设为0 */
+      g_motor_speed[0] = 0;
+      g_motor_speed[1] = 0;
+      g_motor_speed[2] = 0;
+      g_motor_speed[3] = 0;
+      break;
+      
+    /* PID调参指令 - 直接修改PID参数 */
+    case CMD_KP_INC:
+      g_PidMotor1.Kp += 1.0f;
+      g_PidMotor2.Kp += 1.0f;
+      g_PidMotor3.Kp += 1.0f;
+      g_PidMotor4.Kp += 1.0f;
+      break;
+      
+    case CMD_KP_DEC:
+      g_PidMotor1.Kp -= 1.0f;
+      g_PidMotor2.Kp -= 1.0f;
+      g_PidMotor3.Kp -= 1.0f;
+      g_PidMotor4.Kp -= 1.0f;
+      break;
+      
+    case CMD_KI_INC:
+      g_PidMotor1.Ki += 0.1f;
+      g_PidMotor2.Ki += 0.1f;
+      g_PidMotor3.Ki += 0.1f;
+      g_PidMotor4.Ki += 0.1f;
+      break;
+      
+    case CMD_KI_DEC:
+      g_PidMotor1.Ki -= 0.1f;
+      g_PidMotor2.Ki -= 0.1f;
+      g_PidMotor3.Ki -= 0.1f;
+      g_PidMotor4.Ki -= 0.1f;
+      break;
+      
+    case CMD_KD_INC:
+      g_PidMotor1.Kd += 1.0f;
+      g_PidMotor2.Kd += 1.0f;
+      g_PidMotor3.Kd += 1.0f;
+      g_PidMotor4.Kd += 1.0f;
+      break;
+      
+    case CMD_KD_DEC:
+      g_PidMotor1.Kd -= 1.0f;
+      g_PidMotor2.Kd -= 1.0f;
+      g_PidMotor3.Kd -= 1.0f;
+      g_PidMotor4.Kd -= 1.0f;
+      break;
+      
+    default:
+      /* 未知指令，忽略 */
+      break;
+  }
+}
+
 void StartDebugTask(void *argument)
 {
   /* USER CODE BEGIN StartDebugTask */
-  char speed_buf[100];
+  char debug_buf[100];
   char adc_buf[50];
-  float rpm1 = 0.0f, rpm2 = 0.0f, rpm3 = 0.0f, rpm4 = 0.0f;
-  const float ENCODER_RES = 13.0;  /* 编码器线数 */
+  int16_t act_speed1, act_speed2, act_speed3, act_speed4;
+  int32_t encoder_count1, encoder_count2, encoder_count3, encoder_count4;
   static uint8_t rx_buf2[100] = {0};
   static uint8_t rx_buf3[100] = {0};
   static uint32_t rx_len2 = 0;
   static uint32_t rx_len3 = 0;
   uint32_t adc_value = 0;
+  uint8_t i;
   
   /* 发送测试信息 */
   HAL_UART_Transmit(&huart2, (uint8_t*)"USART2 Test Message\r\n", 20, HAL_MAX_DELAY);
@@ -313,34 +452,68 @@ void StartDebugTask(void *argument)
       usart2_rx_flag = 0;
     }
     
-    /* 处理USART3接收数据 */
+    /* 处理USART3接收数据（解析指令）*/
     if (usart3_rx_flag) {
       rx_len3 = HAL_UART_Receive(&huart3, rx_buf3, 100, 100);
       if (rx_len3 > 0) {
-        HAL_UART_Transmit(&huart3, rx_buf3, rx_len3, HAL_MAX_DELAY);
+        /* 解析指令格式：FF（包头）+ 指令（1字节）+ FE（包尾）*/
+        for (i = 0; i < rx_len3; i++) {
+          if (uart_rx_index == 0 && rx_buf3[i] == CMD_HEAD) {
+            /* 收到包头 */
+            uart_rx_buf[0] = rx_buf3[i];
+            uart_rx_index = 1;
+          } else if (uart_rx_index == 1) {
+            /* 收到指令 */
+            uart_rx_buf[1] = rx_buf3[i];
+            uart_rx_index = 2;
+          } else if (uart_rx_index == 2 && rx_buf3[i] == CMD_TAIL) {
+            /* 收到包尾，完成一条指令 */
+            uart_rx_buf[2] = rx_buf3[i];
+            ParseUARTCommand(uart_rx_buf[1]);  /* 解析指令 */
+            uart_rx_index = 0;  /* 重置索引 */
+          } else {
+            /* 格式错误，重置 */
+            uart_rx_index = 0;
+          }
+        }
       }
       usart3_rx_flag = 0;
     }
     
-    /* 计算所有编码器转速 */
-    Encoder_GetAllRPM(&rpm1, &rpm2, &rpm3, &rpm4, ENCODER_RES);
-    
-    /* 格式化输出 - 输出RPM的整数部分 */
-    sprintf(speed_buf, "1:%d  2:%d  3:%d  4:%d\r\n", 
-            (int)rpm1, (int)rpm2, (int)rpm3, (int)rpm4);
+    /* 根据调试模式输出不同内容 */
+    #if DEBUG_MODE == 1
+      /* DEBUG_MODE=1: 速度PID模式，输出目标速度和实际速度（脉冲/秒）*/
+      act_speed1 = Encoder_GetSpeed(1);
+      act_speed2 = Encoder_GetSpeed(2);
+      act_speed3 = Encoder_GetSpeed(3);
+      act_speed4 = Encoder_GetSpeed(4);
+      
+      sprintf(debug_buf, "T:1:%4d 2:%4d 3:%4d 4:%4d | A:1:%4d 2:%4d 3:%4d 4:%4d pps\r\n", 
+              g_motor_speed[0], g_motor_speed[1], g_motor_speed[2], g_motor_speed[3],
+              act_speed1, act_speed2, act_speed3, act_speed4);
+    #elif DEBUG_MODE == 0
+      /* DEBUG_MODE=0: 编码器模式，输出累计脉冲数 */
+      encoder_count1 = Encoder_GetCount(1);
+      encoder_count2 = Encoder_GetCount(2);
+      encoder_count3 = Encoder_GetCount(3);
+      encoder_count4 = Encoder_GetCount(4);
+      
+      sprintf(debug_buf, "ENC: 1:%8ld 2:%8ld 3:%8ld 4:%8ld\r\n", 
+              encoder_count1, encoder_count2, encoder_count3, encoder_count4);
+    #endif
     
     /* 发送到串口3 */
-    HAL_UART_Transmit(&huart3, (uint8_t*)speed_buf, strlen(speed_buf), HAL_MAX_DELAY);
+    HAL_UART_Transmit(&huart3, (uint8_t*)debug_buf, strlen(debug_buf), HAL_MAX_DELAY);
     
     /* ADC采样 */
     HAL_ADC_Start(&hadc1);
     if (HAL_ADC_PollForConversion(&hadc1, 100) == HAL_OK) {
       adc_value = HAL_ADC_GetValue(&hadc1);
-      sprintf(adc_buf, "ADC：%lu\r\n", adc_value);
+      sprintf(adc_buf, "ADC:%lu\r\n", adc_value);
       HAL_UART_Transmit(&huart3, (uint8_t*)adc_buf, strlen(adc_buf), HAL_MAX_DELAY);
     }
     
-    osDelay(1000);  /* 每秒输出一次转速和ADC值 */
+    osDelay(1000);  /* 每秒输出一次 */
   }
   /* USER CODE END StartDebugTask */
 }

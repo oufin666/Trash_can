@@ -10,6 +10,6 @@
 ../Drivers/BSP/Src/pid.c:247:7:PID_Increment_Calculate	32	static
 ../Drivers/BSP/Src/pid.c:292:6:PID_Increment_Reset	16	static
 ../Drivers/BSP/Src/pid.c:309:6:PID_MotorInit	8	static
-../Drivers/BSP/Src/pid.c:341:9:PID_MotorSpeedControl	24	static
-../Drivers/BSP/Src/pid.c:382:6:PID_SetParams	24	static
-../Drivers/BSP/Src/pid.c:399:6:PID_GetParams	24	static
+../Drivers/BSP/Src/pid.c:344:9:PID_MotorSpeedControl	40	static
+../Drivers/BSP/Src/pid.c:404:6:PID_SetParams	24	static
+../Drivers/BSP/Src/pid.c:421:6:PID_GetParams	24	static

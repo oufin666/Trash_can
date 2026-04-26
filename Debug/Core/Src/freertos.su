@@ -1,5 +1,6 @@
-../Core/Src/freertos.c:127:6:MX_FREERTOS_Init	8	static
-../Core/Src/freertos.c:192:6:StartVisionTask	16	static
-../Core/Src/freertos.c:210:6:StartMotionTask	16	static
-../Core/Src/freertos.c:261:6:StartStateTask	16	static
-../Core/Src/freertos.c:280:6:StartDebugTask	208	static
+../Core/Src/freertos.c:132:6:MX_FREERTOS_Init	8	static
+../Core/Src/freertos.c:197:6:StartVisionTask	16	static
+../Core/Src/freertos.c:215:6:StartMotionTask	40	static
+../Core/Src/freertos.c:302:6:StartStateTask	16	static
+../Core/Src/freertos.c:322:6:ParseUARTCommand	24	static
+../Core/Src/freertos.c:418:6:StartDebugTask	224	static

@@ -69,7 +69,7 @@ typedef struct {
 typedef struct {
     TIM_HandleTypeDef *htim;   /*!< 编码器使用的定时器 */
     int32_t       Count;       /*!< 编码器计数值 */
-    int16_t       Speed;       /*!< 计算得到的速度值 */
+    int16_t       Speed;       /*!< 计算得到的速度值（编码器脉冲/秒）*/
 } Encoder_t;
 
 /**
@@ -113,9 +113,62 @@ typedef struct {
 
 /* Exported constants --------------------------------------------------------*/
 
-#define MOTOR_SPEED_MAX     1000    /*!< 电机最大速度 */
+#define MOTOR_SPEED_MAX     1000    /*!< 电机最大速度（PWM占空比对应的速度值）*/
 #define MOTOR_SPEED_MIN     (-1000) /*!< 电机最小速度 */
 #define PWM_PERIOD          999     /*!< PWM周期值，对应CubeMX中TIM8的Counter Period */
+
+/* 电机最大速度（脉冲/秒）- 需根据实际电机参数调整 */
+/* 计算公式：MAX_SPEED_PPS = (电机额定RPM / 60) × 编码器PPR × 减速比 */
+/* 示例：(300 / 60) × 52 × 30 = 7800 pps */
+#define MOTOR_MAX_SPEED_PPS 7800    /*!< 电机最大速度（脉冲/秒）*/
+
+/* 编码器参数 */
+#define ENCODER_RESOLUTION  13      /*!< 编码器线数 */
+#define ENCODER_PPR         (ENCODER_RESOLUTION * 4)  /*!< 编码器每转脉冲数（四倍频）*/
+
+/* 电机减速比 */
+#define MOTOR_GEAR_RATIO    30      /*!< 电机减速比 */
+
+/* 车轮参数 */
+#define WHEEL_DIAMETER      0.065f  /*!< 车轮直径（米），65mm */
+#define WHEEL_CIRCUMFERENCE (WHEEL_DIAMETER * 3.1415926f)  /*!< 车轮周长（米）*/
+
+/* PID控制周期（毫秒）*/
+#define PID_CONTROL_PERIOD  10      /*!< PID控制周期，建议5-20ms */
+
+/* 速度单位转换系数：脉冲/秒 -> 米/秒 */
+#define SPEED_CONV_FACTOR   (WHEEL_CIRCUMFERENCE / (ENCODER_PPR * MOTOR_GEAR_RATIO))
+
+/* 速度限幅（防止溢出）*/
+#define MAX_SPEED_PPS       30000   /*!< 最大速度（脉冲/秒），小于int16_t最大值32767 */
+#define MIN_SPEED_PPS       (-MAX_SPEED_PPS)
+
+/* 调试输出模式选择（修改为单个宏定义）*/
+/* DEBUG_MODE = 0: 输出编码器累计脉冲数 */
+/* DEBUG_MODE = 1: 输出速度PID信息（目标速度、实际速度）*/
+#define DEBUG_MODE           1       /*!< 当前调试模式，默认1（速度PID模式）*/
+
+/* 串口指令定义 */
+#define CMD_HEAD             0xFF    /*!< 指令包头 */
+#define CMD_TAIL             0xFE    /*!< 指令包尾 */
+
+/* 运动控制指令 */
+#define CMD_MOVE_FORWARD     0x01    /*!< 前进 */
+#define CMD_MOVE_BACKWARD    0x02    /*!< 后退 */
+#define CMD_MOVE_LEFT        0x03    /*!< 向左移动 */
+#define CMD_MOVE_RIGHT       0x04    /*!< 向右移动 */
+#define CMD_MOVE_STOP        0x05    /*!< 停止 */
+
+/* PID调参指令 */
+#define CMD_KP_INC           0x11    /*!< KP +1 */
+#define CMD_KP_DEC           0x12    /*!< KP -1 */
+#define CMD_KI_INC           0x13    /*!< KI +0.1 */
+#define CMD_KI_DEC           0x14    /*!< KI -0.1 */
+#define CMD_KD_INC           0x15    /*!< KD +1 */
+#define CMD_KD_DEC           0x16    /*!< KD -1 */
+
+/* 默认移动速度 */
+#define DEFAULT_SPEED        500     /*!< 默认移动速度（脉冲/秒）*/
 
 /* 电机编号定义 */
 #define MOTOR_1             0
@@ -188,6 +241,7 @@ int16_t Motor_LimitSpeed(int16_t speed);
 /* 编码器相关函数 */
 int32_t Encoder_GetCount(uint8_t encoder);
 int16_t Encoder_GetSpeed(uint8_t encoder);
+float Encoder_GetSpeedMS(uint8_t encoder);  /* 获取速度（米/秒）*/
 void Encoder_Update(uint8_t encoder);
 void Encoder_CalculateSpeed(uint8_t encoder, uint16_t period);
 float Encoder_GetRPM(uint8_t encoder, float encoder_res);

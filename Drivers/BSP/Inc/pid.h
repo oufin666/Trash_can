@@ -20,6 +20,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx_hal.h"
+#include "motor.h"  /* 用于获取电机速度限制宏 */
 
 /* Exported types ------------------------------------------------------------*/
 
@@ -76,11 +77,11 @@ typedef struct {
 #define PID_DEFAULT_KI          0.0f
 #define PID_DEFAULT_KD          0.0f
 
-/* 默认输出限幅 */
-#define PID_DEFAULT_MAX_OUTPUT  1000.0f
-#define PID_DEFAULT_MIN_OUTPUT  (-1000.0f)
-#define PID_DEFAULT_MAX_INT     500.0f
-#define PID_DEFAULT_MIN_INT     (-500.0f)
+/* 默认输出限幅 - 使用motor.h中定义的电机速度限制 */
+#define PID_DEFAULT_MAX_OUTPUT  ((float)MOTOR_SPEED_MAX)
+#define PID_DEFAULT_MIN_OUTPUT  ((float)MOTOR_SPEED_MIN)
+#define PID_DEFAULT_MAX_INT     (PID_DEFAULT_MAX_OUTPUT * 0.3f)  /* 积分限幅为最大输出的30% */
+#define PID_DEFAULT_MIN_INT     (PID_DEFAULT_MIN_OUTPUT * 0.3f)
 
 /* 电机速度环PID参数（需要根据实际电机调试） */
 #define MOTOR_PID_KP            5.0f

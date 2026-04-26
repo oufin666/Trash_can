@@ -330,17 +330,22 @@ void PID_MotorInit(void)
 }
 
 /**
-  * @brief  电机速度闭环控制
+  * @brief  电机速度闭环控制（带前馈）
   * @param  motor_id: 电机编号 (0~3)
-  * @param  target_speed: 目标速度 (-1000 ~ 1000)
-  * @param  actual_speed: 实际速度（编码器反馈值）
-  * @retval PID计算后的电机控制量
+  * @param  target_speed: 目标速度（脉冲/秒）
+  * @param  actual_speed: 实际速度（脉冲/秒）
+  * @retval 电机控制量 (-1000 ~ 1000)
   * 
   * @note   需要在定时器中断中周期性调用，建议控制周期为5~10ms
+  * @note   输出 = 前馈项 + PID校正项
+  *         前馈项 = 目标速度 / 最大速度 * 最大输出
+  *         PID校正项 = 误差的校正（消除偏差）
   */
 int16_t PID_MotorSpeedControl(uint8_t motor_id, int16_t target_speed, int16_t actual_speed)
 {
-    float output;
+    float pid_output;
+    float feedforward;
+    float total_output;
     PID_Position_t *pid = NULL;
     
     /* 选择对应的PID控制器 */
@@ -361,14 +366,31 @@ int16_t PID_MotorSpeedControl(uint8_t motor_id, int16_t target_speed, int16_t ac
             return 0;
     }
     
-    /* 设置目标速度 */
-    PID_Position_SetTarget(pid, (float)target_speed);
+    /* 计算前馈项：基础PWM = 目标速度 / 最大速度 * 最大输出 */
+    if (MOTOR_MAX_SPEED_PPS != 0) {
+        feedforward = ((float)target_speed / (float)MOTOR_MAX_SPEED_PPS) * 1000.0f;
+    } else {
+        feedforward = 0.0f;
+    }
     
-    /* 执行PID计算 */
-    output = PID_Position_Calculate(pid, (float)actual_speed);
+    /* 设置PID目标为0（PID只计算误差校正）*/
+    PID_Position_SetTarget(pid, 0.0f);
+    
+    /* 计算误差：误差 = 目标速度 - 实际速度 */
+    float error = (float)(target_speed - actual_speed);
+    
+    /* 执行PID计算（计算校正项）*/
+    pid_output = PID_Position_Calculate(pid, -error);
+    
+    /* 总输出 = 前馈项 + PID校正项 */
+    total_output = feedforward + pid_output;
+    
+    /* 输出限幅 */
+    if (total_output > 1000.0f) total_output = 1000.0f;
+    if (total_output < -1000.0f) total_output = -1000.0f;
     
     /* 返回整型控制量 */
-    return (int16_t)output;
+    return (int16_t)total_output;
 }
 
 /**

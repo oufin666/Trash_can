@@ -1,5 +1,6 @@
-../Core/Src/freertos.c:127:6:MX_FREERTOS_Init	1
-../Core/Src/freertos.c:192:6:StartVisionTask	1
-../Core/Src/freertos.c:210:6:StartMotionTask	5
-../Core/Src/freertos.c:261:6:StartStateTask	1
-../Core/Src/freertos.c:280:6:StartDebugTask	6
+../Core/Src/freertos.c:132:6:MX_FREERTOS_Init	1
+../Core/Src/freertos.c:197:6:StartVisionTask	1
+../Core/Src/freertos.c:215:6:StartMotionTask	13
+../Core/Src/freertos.c:302:6:StartStateTask	1
+../Core/Src/freertos.c:322:6:ParseUARTCommand	12
+../Core/Src/freertos.c:418:6:StartDebugTask	12

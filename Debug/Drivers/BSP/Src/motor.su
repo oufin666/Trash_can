@@ -12,7 +12,8 @@
 ../Drivers/BSP/Src/motor.c:434:6:Chassis_Brake	8	static
 ../Drivers/BSP/Src/motor.c:448:9:Encoder_GetCount	16	static
 ../Drivers/BSP/Src/motor.c:470:9:Encoder_GetSpeed	16	static
-../Drivers/BSP/Src/motor.c:492:6:Encoder_Update	16	static
-../Drivers/BSP/Src/motor.c:517:6:Encoder_CalculateSpeed	24	static
-../Drivers/BSP/Src/motor.c:560:7:Encoder_GetRPM	24	static
-../Drivers/BSP/Src/motor.c:576:6:Encoder_GetAllRPM	32	static
+../Drivers/BSP/Src/motor.c:492:7:Encoder_GetSpeedMS	24	static
+../Drivers/BSP/Src/motor.c:503:6:Encoder_Update	16	static
+../Drivers/BSP/Src/motor.c:531:6:Encoder_CalculateSpeed	32	static
+../Drivers/BSP/Src/motor.c:588:7:Encoder_GetRPM	24	static
+../Drivers/BSP/Src/motor.c:604:6:Encoder_GetAllRPM	32	static

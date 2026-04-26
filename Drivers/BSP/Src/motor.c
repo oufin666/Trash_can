@@ -465,7 +465,7 @@ int32_t Encoder_GetCount(uint8_t encoder)
 /**
   * @brief  读取单个编码器速度
   * @param  encoder: 编码器索引 (1-4)
-  * @retval 编码器速度值
+  * @retval 编码器速度值（脉冲/秒）
   */
 int16_t Encoder_GetSpeed(uint8_t encoder)
 {
@@ -482,6 +482,17 @@ int16_t Encoder_GetSpeed(uint8_t encoder)
         default:
             return 0;
     }
+}
+
+/**
+  * @brief  获取编码器速度（米/秒）
+  * @param  encoder: 编码器索引 (1-4)
+  * @retval 速度值（米/秒）
+  */
+float Encoder_GetSpeedMS(uint8_t encoder)
+{
+    int16_t speed = Encoder_GetSpeed(encoder);
+    return (float)speed * SPEED_CONV_FACTOR;
 }
 
 /**
@@ -513,39 +524,56 @@ void Encoder_Update(uint8_t encoder)
   * @param  encoder: 编码器索引 (1-4)
   * @param  period: 计算周期 (ms)
   * @retval None
+  * 
+  * @note   速度计算公式：
+  *         速度 = (脉冲变化量 * 1000) / 周期(ms) -> 脉冲/秒
   */
 void Encoder_CalculateSpeed(uint8_t encoder, uint16_t period)
 {
     static int32_t last_count[4] = {0, 0, 0, 0};
     int32_t current_count, delta;
+    int32_t speed;
     
     switch(encoder)
     {
         case 1:
             current_count = (int32_t)__HAL_TIM_GET_COUNTER(g_Chassis.Encoder1.htim);
             delta = current_count - last_count[0];
-            g_Chassis.Encoder1.Speed = (int16_t)((delta * 1000) / period);
+            speed = (delta * 1000) / period;
+            /* 限幅保护 */
+            if (speed > MAX_SPEED_PPS) speed = MAX_SPEED_PPS;
+            if (speed < MIN_SPEED_PPS) speed = MIN_SPEED_PPS;
+            g_Chassis.Encoder1.Speed = (int16_t)speed;
             last_count[0] = current_count;
             break;
         
         case 2:
             current_count = (int32_t)__HAL_TIM_GET_COUNTER(g_Chassis.Encoder2.htim);
             delta = current_count - last_count[1];
-            g_Chassis.Encoder2.Speed = (int16_t)((delta * 1000) / period);
+            speed = (delta * 1000) / period;
+            if (speed > MAX_SPEED_PPS) speed = MAX_SPEED_PPS;
+            if (speed < MIN_SPEED_PPS) speed = MIN_SPEED_PPS;
+            g_Chassis.Encoder2.Speed = (int16_t)speed;
             last_count[1] = current_count;
             break;
         
         case 3:
             current_count = (int32_t)__HAL_TIM_GET_COUNTER(g_Chassis.Encoder3.htim);
             delta = current_count - last_count[2];
-            g_Chassis.Encoder3.Speed = (int16_t)((delta * 1000) / period);
+            speed = (delta * 1000) / period;
+            if (speed > MAX_SPEED_PPS) speed = MAX_SPEED_PPS;
+            if (speed < MIN_SPEED_PPS) speed = MIN_SPEED_PPS;
+            g_Chassis.Encoder3.Speed = (int16_t)speed;
             last_count[2] = current_count;
             break;
         
         case 4:
             current_count = (int32_t)__HAL_TIM_GET_COUNTER(g_Chassis.Encoder4.htim);
             delta = current_count - last_count[3];
-            g_Chassis.Encoder4.Speed = (int16_t)((delta * 1000) / period);
+            speed = (delta * 1000) / period;
+            if (speed > MAX_SPEED_PPS) speed = MAX_SPEED_PPS;
+            if (speed < MIN_SPEED_PPS) speed = MIN_SPEED_PPS;
+            g_Chassis.Encoder4.Speed = (int16_t)speed;
             last_count[3] = current_count;
             break;
     }
